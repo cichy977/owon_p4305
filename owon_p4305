@@ -1,0 +1,318 @@
+#!/usr/bin/python3
+# PYTHON_ARGCOMPLETE_OK
+# Tomasz Cichuta <tomasz.cichuta@gmail.com>
+
+import argparse
+import argcomplete
+from pyvisa import ResourceManager
+from pyvisa.resources.messagebased import MessageBasedResource
+from time import sleep
+from math import isclose
+
+
+class OwonP4305(object):
+
+    def __init__(self, port):
+        
+        self.port = port
+        self.rm = ResourceManager()
+        
+        def init_inst(port) -> MessageBasedResource:
+            inst = self.rm.open_resource(f'ASRL{port}::INSTR',
+                                            baud_rate = 115200,
+                                            write_termination= '\n',
+                                            read_termination='\r',
+                                            timeout = 1000)
+            return inst
+        
+        self.inst = init_inst(self.port)
+        self.request = Requests()
+    
+    def get_id(self) -> str:
+        id = self.inst.query(self.request.get_id())
+        print(f"Power Supply ID: {id}")
+        return f'id'
+    
+    def reset_power_supply(self) -> None:
+        self.inst.write(self.request.reset())
+        sleep(1)
+        id = self.inst.query(self.request.get_id())
+        out = int(self.inst.query(self.request.get_output_state()))
+        if 'P4305' in id and out == 0:
+            print(f'Reset of the Power Supply: {id} has been done, OUT is OFF state now')
+        else:
+            raise Exception
+        
+    def meas_output_voltage(self) -> float:
+        volt = float(self.inst.query(self.request.meas_voltage()))
+        print(f'Output supply voltage measure: {volt} [V]')
+        return volt
+        
+    def meas_output_current(self) -> float:
+        curr = float(self.inst.query(self.request.meas_current()))
+        print(f'Output supply current measure: {curr} [A]')
+        return curr
+    
+    def meas_output_power(self) -> float:
+        power = float(self.inst.query(self.request.meas_power()))
+        print(f'Output supply power measure: {power} [W]')
+        return power
+        
+    def get_output_state(self) -> int:
+        output_state = int(self.inst.query(self.request.get_output_state()))
+        if output_state == 0:
+            print(f'Output is: OFF')
+        if output_state == 1 :
+            print(f'Output is: ON')
+        return output_state
+        
+        
+    def set_output_state_to_on(self) -> None:
+        self.inst.write(self.request.set_output_on())
+        output_state = int(self.inst.query(self.request.get_output_state()))
+        if output_state == 1:
+            print(f"Output set to: ON")
+        else:
+            raise Exception
+        
+    def set_output_state_to_off(self) -> None:
+        self.inst.write(self.request.set_output_off())
+        output_state = int(self.inst.query(self.request.get_output_state()))
+        if output_state == 0:
+            print(f"Output set to: OFF")
+        else:
+            raise Exception
+        
+
+    def get_output_current_limit(self) -> float:
+        curr = float(self.inst.query(self.request.get_current_limit()))
+        print(f'Output supply current limit: {curr} [A]')
+        return curr
+    
+    def set_output_current_limit(self, value: float) -> float:
+        self.inst.write(self.request.set_current_limit(value))
+        curr = float(self.inst.query(self.request.get_current_limit()))
+        if isclose(curr, float(value)):
+            print(f'Set output supply current limit to: {curr} [A]')
+        else:
+            raise Exception
+        return curr   
+    
+    def get_output_overcurrent_protect(self) -> float:
+        overcurr = float(self.inst.query(self.request.get_over_current_protetc()))
+        print(f'Output supply overcurrent protect: {overcurr} [A]')
+        return overcurr
+    
+    def set_output_overcurrent_protect(self, value: float) -> float:
+        self.inst.write(self.request.set_over_current_protetc(value))
+        overcurrent = float(self.inst.query(self.request.get_over_current_protetc()))
+        if isclose(overcurrent, float(value)):
+            print(f'Set output supply overcurrent protect to: {overcurrent} [A]')
+        else:
+            raise Exception
+        return overcurrent
+    
+    def get_output_voltage(self) -> float:
+        volt = float(self.inst.query(self.request.get_voltage_settings()))
+        print(f'Output supply voltage: {volt} [V]')
+        return volt
+    
+    def set_output_voltage(self, value: float) -> float:
+        self.inst.write(self.request.set_out_voltage(value))
+        volt = float(self.inst.query(self.request.get_voltage_settings()))
+        if isclose(volt, float(value)):
+            print(f'Set output supply voltage to: {volt} [V]')
+        else:
+            raise Exception
+        return volt
+    
+    def get_output_overvoltage_protect(self) -> float:
+        overvolt = float(self.inst.query(self.request.get_over_voltage_protect()))
+        print(f'Output supply overvoltage protect: {overvolt} [V]')
+    
+    def set_output_overvoltage_protect(self, value: float) -> float:
+        self.inst.write(self.request.set_over_voltage_protect(value))
+        overvolt = float(self.inst.query(self.request.get_over_voltage_protect()))
+        if isclose(overvolt, float(value)):
+            print(f'Set output supply overvoltage protect to: {overvolt} [V]')
+        else:
+            raise Exception
+        return overvolt
+    
+        
+class Requests(object):
+    
+    def __init__(self) -> None:
+        pass
+    
+        # Legend based on https://sigrok.org/wiki/Owon_P4000_series:
+        #
+        # function name                  # Request       # Example output    # Remarks
+        # get_id =                       '*IDN?'         #                   # OWON,P4603,2037363,FV:V1.6.0	Get identification number
+        # reset =                        '*RST'          #                   # Reset to factory defaults
+        # meas_voltage =                 'MEAS:VOLT?'    # 0.000             # Returns voltage present on output, 0.000 if output is turned off.
+        # meas_current =                 'MEAS:CURR?'    # 0.000             # Returns current on output.
+        # meas_power =                   'MEAS:POW?'     # 0.000             # Returns power in watts measured on output.
+        # get_output_state =             'OUTP?'         # 0 or 1            # Query whether output is on.
+        # set_output_on =                'OUTP 0'        #                   # Turn output on
+        # set_output_off =               'OUTP 1'        #                   # Turn output off
+        # get_current_limit =            'CURR?'         # 1.000             # Returns the current limit setting.
+        # set_current_limit =            'CURR 1.000'    #                   # Sets the current limit
+        # get_over_current_protetc =     'CURR:LIM?'     # 1.000             # Returns the overcurrent protection setting.
+        # set_over_current_protetc =     'CURR:LIM 1.0'  #                   # Sets the overcurrent protection setting.
+        # get_voltage_settings =         'VOLT?'         # 1.000             # Returns the voltage setting.
+        # set_out_voltage =              'VOLT 1.000'    #                   # Sets the output voltage
+        # get_over_voltage_protect =     'VOLT:LIM?'     # 1.000             # Returns the overvoltage protection setting.
+        # set_over_voltage_protect =     'VOLT:LIM 1.0'  #                   # Sets the overvoltage protection setting.
+    
+
+    def get_id(self) -> str:
+        return f'*IDN?'
+    
+    def reset(self) -> str:
+        return f'*RST'
+    
+    def meas_voltage(self) -> str:
+        return f'MEAS:VOLT?'
+    
+    def meas_current(self) -> str:
+        return f'MEAS:CURR?'
+    
+    def meas_power(self) -> str:
+        return f'MEAS:POW?'
+    
+    def get_output_state(self) -> str:
+        return f'OUTP?'
+    
+    def set_output_on(self) -> str:
+        return f'OUTP 1'
+    
+    def set_output_off(self) -> str:
+        return f'OUTP 0'
+    
+    def get_current_limit(self) -> str:
+        return f'CURR?'
+    
+    def set_current_limit(self, value: float) -> str:
+        return f'CURR {value}' 
+    
+    def get_over_current_protetc(self) -> str:
+        return f'CURR:LIM?'
+    
+    def set_over_current_protetc(self, value: float) -> str:
+        return f'CURR:LIM {value}'
+    
+    def get_voltage_settings(self) -> str:
+        return f'VOLT?'
+    
+    def set_out_voltage(self, value: float) -> str:
+        return f'VOLT {value}'
+    
+    def get_over_voltage_protect(self) -> str:
+        return f'VOLT:LIM?'
+    
+    def set_over_voltage_protect(self, value: float) -> str:
+        return f'VOLT:LIM {value}'
+    
+    
+def main(**args):
+    
+    owon_p4305 = OwonP4305(port)
+    
+    if reset \
+        and not get_attr \
+            and not set_attr \
+                and not meas:
+                    owon_p4305.reset_power_supply()
+    
+    
+    match get_attr:
+        case 'id':
+            owon_p4305.get_id()
+        case 'out_state':
+            owon_p4305.get_output_state()
+        case 'volt':
+            owon_p4305.get_output_voltage()
+        case 'overvolt':
+            owon_p4305.get_output_overvoltage_protect()
+        case 'curr':
+            owon_p4305.get_output_current_limit()
+        case 'overcurr':
+            owon_p4305.get_output_overcurrent_protect()    
+        case 'summary':
+            owon_p4305.get_id()
+            owon_p4305.get_output_state()
+            owon_p4305.get_output_voltage()
+            owon_p4305.get_output_overvoltage_protect()
+            owon_p4305.get_output_current_limit()
+            owon_p4305.get_output_overcurrent_protect()
+            
+            
+    match set_attr:
+        case 'out_on':
+            owon_p4305.set_output_state_to_on()
+        case 'out_off':
+            owon_p4305.set_output_state_to_off
+        case 'volt':
+            if value_attr:
+                owon_p4305.set_output_voltage(value_attr)
+            else:
+                print(f"New volts value missing!")
+        case 'overvolt':
+            if value_attr:
+                owon_p4305.set_output_overvoltage_protect(value_attr)
+            else:
+                print(f"New overvolt value missing!")
+        case 'curr':
+            if value_attr:
+                owon_p4305.set_output_current_limit(value_attr)
+            else:
+                print(f"New current limit value missing!")
+        case 'overcurr':
+            if value_attr:
+                owon_p4305.set_output_overcurrent_protect(value_attr)
+            else:
+                print(f"New overcurrent value missing!")
+
+                
+    match meas:
+        case 'volt':
+            owon_p4305.meas_output_voltage()
+        case 'curr':
+            owon_p4305.meas_output_current()
+        case 'power':
+            owon_p4305.meas_output_power()
+        case 'summary':
+            owon_p4305.meas_output_voltage()
+            owon_p4305.meas_output_current()
+            owon_p4305.meas_output_power()
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(prog='owon_p4305', description='Manage the Owon P4305 Power Supply')
+    
+    parser.add_argument('--port', type=str, help='Serial port device', required=True, choices=['/dev/ttyUSB1', '/dev/ttyUSB0'])
+    parser.add_argument('--reset', nargs='?', const=1, type=int, default=1, help='Reset the Power Supply')
+    parser.add_argument('--get', help='Get from device', required=False, default=None, choices=['out_state', 'volt', 'overvolt', 'curr', 'overcurr', 'id', 'summary'])
+    parser.add_argument('--set', help='Set to device', required=False, default=None, choices=['out_on', 'out_off', 'volt', 'overvolt', 'curr', 'overcurr'])
+    parser.add_argument('--meas', help='Measure value on output', required=False, default=None, choices=['volt', 'curr', 'power', 'summary'])
+    parser.add_argument('value', nargs='?', default=None, help='Voltage or current value')
+    
+    argcomplete.autocomplete(parser)
+    
+    try:
+        args = parser.parse_args()
+    except:
+        parser.print_help()
+        print('Please run: eval "$(register-python-argcomplete owon_p4305)" in console to enable autocomplete arguments')
+        exit(-1)
+
+    port = args.port
+    get_attr = args.get
+    set_attr = args.set
+    reset = args.reset
+    meas = args.meas
+    value_attr = args.value
+        
+    main(**vars(args))
