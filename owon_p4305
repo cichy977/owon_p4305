@@ -66,7 +66,6 @@ class OwonP4305(object):
             print(f'Output is: ON')
         return output_state
         
-        
     def set_output_state_to_on(self) -> None:
         self.inst.write(self.request.set_output_on())
         output_state = int(self.inst.query(self.request.get_output_state()))
@@ -83,7 +82,6 @@ class OwonP4305(object):
         else:
             raise Exception
         
-
     def get_output_current_limit(self) -> float:
         curr = float(self.inst.query(self.request.get_current_limit()))
         print(f'Output supply current limit: {curr} [A]')
@@ -217,16 +215,15 @@ class Requests(object):
     
 def main(**args):
     
-    owon_p4305 = OwonP4305(port)
+    owon_p4305 = OwonP4305(args.port)
     
-    if reset \
-        and not get_attr \
-            and not set_attr \
-                and not meas:
+    if args.reset \
+        and not args.get_attr \
+            and not args.set_attr \
+                and not args.meas:
                     owon_p4305.reset_power_supply()
     
-    
-    match get_attr:
+    match args.get_attr:
         case 'id':
             owon_p4305.get_id()
         case 'out_state':
@@ -247,35 +244,33 @@ def main(**args):
             owon_p4305.get_output_current_limit()
             owon_p4305.get_output_overcurrent_protect()
             
-            
-    match set_attr:
+    match args.set_attr:
         case 'out_on':
             owon_p4305.set_output_state_to_on()
         case 'out_off':
-            owon_p4305.set_output_state_to_off
+            owon_p4305.set_output_state_to_off()
         case 'volt':
-            if value_attr:
-                owon_p4305.set_output_voltage(value_attr)
+            if args.value_attr:
+                owon_p4305.set_output_voltage(args.value_attr)
             else:
                 print(f"New volts value missing!")
         case 'overvolt':
-            if value_attr:
-                owon_p4305.set_output_overvoltage_protect(value_attr)
+            if args.value_attr:
+                owon_p4305.set_output_overvoltage_protect(args.value_attr)
             else:
                 print(f"New overvolt value missing!")
         case 'curr':
-            if value_attr:
-                owon_p4305.set_output_current_limit(value_attr)
+            if args.value_attr:
+                owon_p4305.set_output_current_limit(args.value_attr)
             else:
                 print(f"New current limit value missing!")
         case 'overcurr':
-            if value_attr:
-                owon_p4305.set_output_overcurrent_protect(value_attr)
+            if args.value_attr:
+                owon_p4305.set_output_overcurrent_protect(args.value_attr)
             else:
                 print(f"New overcurrent value missing!")
 
-                
-    match meas:
+    match args.meas:
         case 'volt':
             owon_p4305.meas_output_voltage()
         case 'curr':
@@ -307,12 +302,5 @@ if __name__ == '__main__':
         parser.print_help()
         print('Please run: eval "$(register-python-argcomplete owon_p4305)" in console to enable autocomplete arguments')
         exit(-1)
-
-    port = args.port
-    get_attr = args.get
-    set_attr = args.set
-    reset = args.reset
-    meas = args.meas
-    value_attr = args.value
         
     main(**vars(args))
