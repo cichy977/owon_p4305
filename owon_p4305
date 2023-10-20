@@ -213,7 +213,7 @@ class Requests(object):
         return f'VOLT:LIM {value}'
     
     
-def main(**args):
+def main(args):
     
     owon_p4305 = OwonP4305(args.port)
     
@@ -298,9 +298,13 @@ if __name__ == '__main__':
     
     try:
         args = parser.parse_args()
-    except:
-        parser.print_help()
+    except argparse.ArgumentError:
         print('Please run: eval "$(register-python-argcomplete owon_p4305)" in console to enable autocomplete arguments')
         exit(-1)
         
-    main(**vars(args))
+    if args.port and not args.get or not args.set or  not args.meas or not args.reset:
+        parser.print_usage()
+        print('owon_p4305: error: one of the following arguments are required: --reset, --get, --set, --meas')
+        exit(0)
+
+    main(args)
